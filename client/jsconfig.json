@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "commonjs",
+    "baseUrl": "src"
+  },
+  "include": ["src/**/*", "../full-version/src/components/cards/invoice/InvoiceCard.jsx"],
+  "exclude": ["node_modules"]
+}

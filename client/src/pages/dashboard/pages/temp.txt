@@ -1,0 +1,695 @@
+import PropTypes from 'prop-types';
+import { useEffect, useState, useRef, forwardRef } from 'react';
+
+// material-ui
+import { useTheme } from '@mui/material/styles';
+import Box from '@mui/material/Box';
+import Grid from '@mui/material/Grid';
+import Chip from '@mui/material/Chip';
+import Stack from '@mui/material/Stack';
+import Table from '@mui/material/Table';
+import Divider from '@mui/material/Divider';
+import Skeleton from '@mui/material/Skeleton';
+import TableRow from '@mui/material/TableRow';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableHead from '@mui/material/TableHead';
+import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
+import FormControl from '@mui/material/FormControl';
+import TableContainer from '@mui/material/TableContainer';
+
+// third-party
+import ReactToPrint from 'react-to-print';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+
+// project-imports
+import MainCard from 'components/MainCard';
+import LogoSection from 'components/logo';
+import Breadcrumbs from 'components/@extended/Breadcrumbs';
+import LoadingButton from 'components/@extended/LoadingButton';
+
+import { APP_DEFAULT_PATH, ThemeMode } from 'config';
+// import { useGetInvoice, useGetInvoiceMaster } from 'api/invoice';
+// import ExportPDFView from 'sections/apps/invoice/export-pdf';
+
+// ---------------------------
+// useGetInvoice
+// ---------------------------
+// export const useGetInvoice = () => {
+//   const [invoice, setInvoice] = useState([]);
+//   const [invoiceLoading, setInvoiceLoading] = useState(true);
+
+//   useEffect(() => {
+//     // simulate API fetch
+//     const timer = setTimeout(() => {
+//       setInvoice(mockInvoice);
+//       setInvoiceLoading(false);
+//     }, 500);
+//     return () => clearTimeout(timer);
+//   }, []);
+
+//   return { invoice, invoiceLoading };
+// };
+
+// ---------------------------
+// useGetInvoiceMaster
+// ---------------------------
+// export const useGetInvoiceMaster = () => {
+//   const [invoiceMaster, setInvoiceMaster] = useState(undefined);
+//   const [invoiceMasterLoading, setInvoiceMasterLoading] = useState(true);
+
+//   useEffect(() => {
+//     // simulate API fetch
+//     const timer = setTimeout(() => {
+//       setInvoiceMaster(mockInvoiceMaster);
+//       setInvoiceMasterLoading(false);
+//     }, 500);
+//     return () => clearTimeout(timer);
+//   }, []);
+
+//   return { invoiceMaster, invoiceMasterLoading };
+// };
+// assets
+import { DocumentDownload, Edit, Printer, Share } from 'iconsax-react';
+import { useLocation, useNavigate, useParams } from 'react-router';
+import ExportPDFView from 'sections/apps/invoice/export-pdf';
+import { useBundleById } from 'api/queries/bundles';
+import { Button } from '@mui/material';
+import { useCreateBundlePurchase } from 'api/queries/bundlepurchases';
+import { openSnackbar } from 'api/snackbar';
+import { useGetInvoiceMaster } from 'api/invoice';
+import { format } from 'date-fns';
+import { useCreateExternalInvoice } from 'api/queries/invoice';
+import { useAdminProfile, useUserProfile } from 'api/queries/userProfile';
+
+function PDFIconButton({ list }) {
+  const theme = useTheme();
+  return (
+    <PDFDownloadLink document={<ExportPDFView list={list} />} fileName={`${list.invoice_id}-${list.customer_name}.pdf`}>
+      <IconButton>
+        <DocumentDownload color={theme.palette.mode === ThemeMode.DARK ? theme.palette.background.paper : theme.palette.text.secondary} />
+      </IconButton>
+    </PDFDownloadLink>
+  );
+}
+
+// ==============================|| INVOICE - DETAILS ||============================== //
+
+export default function InvoiceCheckout() {
+  const theme = useTheme();
+  const navigation = useNavigate();
+  const { state } = useLocation();
+  const [isCreatingNew, setIsCreatingNew] = useState(state.invoiceType === 'external');
+  // const isCreatingNew = state.invoiceType === 'external';
+  const location = useLocation();
+  const [ispurachsed, setIsPurchased] = useState(false);
+  const [purchasedPayload, setPurchasedPayload] = useState({
+    invoiceId: null,
+    status: 'pending'
+  });
+  const createExternalInvoiceMutation = useCreateExternalInvoice();
+  const { data, isLoading, error } = useAdminProfile();
+  const { data: profile, isLoading: isUserProfileLoading, error: isUserProfileError } = useUserProfile();
+
+  console.log('DATA ', profile?.data);
+
+  const generateInvoiceNumber = (prefix = 'EXT') => {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+
+    // Unique part: timestamp in milliseconds (last 4 digits)
+    const unique = String(date.getTime()).slice(-4);
+
+    return `${prefix}-${year}${month}-${unique}`;
+  };
+
+  const uniqueId = state.uniqueId || generateInvoiceNumber();
+
+  // console.log({ Printer });
+  // const { invoiceLoading, invoice } = useGetInvoice();
+  const { invoiceMaster, invoiceMasterLoading } = useGetInvoiceMaster();
+  const invoiceLoading = false;
+
+  const [list, seList] = useState(null);
+
+  console.log('state', state);
+  console.log('list..', list);
+
+  useEffect(() => {
+    if (state) {
+      const mappedData = {
+        id: 1, // You might want to generate this dynamically
+        invoice_id: ispurachsed ? purchasedPayload.invoiceId : state.bundleId || 'N/A',
+        customer_name: state.customerInfo?.name || 'N/A',
+        customerInfo: {
+          name: state.customerInfo?.name || 'N/A',
+          email: state.customerInfo?.email || 'N/A',
+          phone: state?.customerInfo?.vatNumber || 'N/A',
+          address: state?.customerInfo?.address || 'N/A',
+          id: state?.customerInfo?.companyId || null
+        },
+        status: purchasedPayload.status || state.status || 'Pending',
+        cashierInfo: {
+          name: state?.cashierInfo?.name || 'N/A',
+          email: state?.cashierInfo?.email || 'N/A',
+          phone: state?.cashierInfo?.phone || 'N/A',
+          address: state?.cashierInfo?.address || 'N/A'
+        },
+        // date: state.purchaseDate ? state.purchaseDate.split('T')[0] : 'N/A',
+        date: state.purchaseDate
+          ? typeof state.purchaseDate === 'string'
+            ? state.purchaseDate.split('T')[0]
+            : format(state.purchaseDate, 'yyyy-MM-dd')
+          : 'N/A' || state.type === 'external'
+            ? format(new Date(), 'yyyy-MM-dd')
+            : 'N/A',
+        // due_date: state.purchaseDate ? state.purchaseDate.split('T')[0] : 'N/A',
+        tax: 0,
+        notes: state.notes || '',
+        discount: state.discounts?.bundleDiscount?.percentage || 0,
+        invoice_detail: [
+          {
+            name: state.bundleDetails?.title || 'N/A',
+            description: state.bundleDetails?.description || 'N/A',
+            qty: state.seatsPurchased || 1,
+            price: state.bundleDetails?.seatPrice || 0
+          }
+        ]
+      };
+      seList(mappedData);
+    }
+  }, [state]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const invoiceId = params.get('invoiceId');
+    const status = params.get('status');
+
+    if (invoiceId && status) {
+      setIsPurchased(true);
+      setPurchasedPayload({ invoiceId, status });
+      seList((prev) => ({ ...prev, invoice_id: invoiceId }));
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    if (data?.data) {
+      seList((prev) => ({
+        ...prev,
+        cashierInfo: {
+          name: data.data.businessName || prev?.cashierInfo?.name || 'N/A',
+          email: data.data.email || prev?.cashierInfo?.email || 'N/A',
+          phone: data.data.phoneNumber || prev?.cashierInfo?.phone || 'N/A',
+          address: data.data.businessAddress || prev?.cashierInfo?.address || 'N/A'
+        },
+        customerInfo: {
+          name: data.data.businessName || prev?.cashierInfo?.name || 'N/A',
+          email: data.data.email || prev?.cashierInfo?.email || 'N/A',
+          phone: data.data.phoneNumber || prev?.cashierInfo?.phone || 'N/A',
+          address: data.data.businessAddress || prev?.cashierInfo?.address || 'N/A',
+          id: state?.customerInfo?.companyId || null
+        }
+      }));
+    }
+  }, [data]);
+
+  const today = new Date(`${list?.date}`).toLocaleDateString('en-GB', {
+    month: 'numeric',
+    day: 'numeric',
+    year: 'numeric'
+  });
+
+  const due_dates = new Date(`${list?.due_date}`).toLocaleDateString('en-GB', {
+    month: 'numeric',
+    day: 'numeric',
+    year: 'numeric'
+  });
+
+  const subtotal = list?.invoice_detail?.reduce((prev, curr) => {
+    if (curr?.name.trim().length > 0) return prev + Number(curr.price * Math.floor(curr.qty));
+    else return prev;
+  }, 0);
+
+  const taxRate = (Number(list?.tax) * subtotal) / 100;
+  const discountRate = state?.pricing?.discountAmount || 0;
+  const total = state?.pricing?.finalTotal || 0;
+  const componentRef = useRef(null);
+
+  const isLoader = invoiceLoading || invoiceMasterLoading || list === null;
+
+  const iconColor = theme.palette.mode === ThemeMode.DARK ? theme.palette.background.paper : theme.palette.text.secondary;
+  const createBundlePurchase = useCreateBundlePurchase();
+  // Handle bundle purchase
+  const handlePurchase = async () => {
+    if (!state) {
+      openSnackbar({
+        open: true,
+        message: 'No bundle data found. Please try again.',
+        variant: 'alert',
+        alert: {
+          color: 'error'
+        },
+        anchorOrigin: {
+          vertical: 'top',
+          horizontal: 'right'
+        }
+      });
+      return;
+    }
+    try {
+      const totalQuantity = state.seatsPurchased;
+      if (totalQuantity > 0) {
+        const payload = {
+          bundleId: state.bundleId,
+          seatsPurchased: totalQuantity,
+          discountId: state?.discounts?.appliedDiscount?.id || null
+        };
+
+        const response = await createBundlePurchase.mutateAsync(payload);
+
+        if (response?.success) {
+          const invoiceId = response.data.invoices[0].invoiceNumber;
+          const status = response.data.invoices[0].status;
+
+          setIsPurchased(true);
+          setPurchasedPayload({ invoiceId, status });
+          navigation(`${location.pathname}?invoiceId=${invoiceId}&status=${status}`, { replace: true, state });
+          openSnackbar({
+            open: true,
+            message: 'Purchase successful!',
+            variant: 'alert',
+            alert: {
+              color: 'success'
+            },
+            anchorOrigin: {
+              vertical: 'top',
+              horizontal: 'right'
+            }
+          });
+          localStorage.removeItem('cartItemId');
+          // setTimeout(() => navigation('/contrib_dashboard/buy_new_license'), 3000);
+        }
+        // await axiosInstance.post(`/courses/purchase_bundle_seats/${bundleId}/${totalQuantity}`, { buyer: currentUser });
+        // toast.success('Purchase successful! Redirecting...');
+      } else {
+        // toast.error('No courses selected.');
+        openSnackbar({
+          open: true,
+          message: 'No courses selected.',
+          variant: 'alert',
+          alert: {
+            color: 'error'
+          },
+          anchorOrigin: {
+            vertical: 'top',
+            horizontal: 'right'
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error during purchase:', error.response?.data || error.message);
+    }
+  };
+
+  const PrintableInvoice = forwardRef(({ children }, ref) => (
+    <div ref={ref} id="print">
+      {children}
+    </div>
+  ));
+
+  // Function to generate PDF as blob
+  const generatePDF = async () => {
+    return new Promise((resolve) => {
+      // Create a temporary PDFDownloadLink to get the blob
+      const link = document.createElement('a');
+      link.style.display = 'none';
+
+      // We'll use the existing ExportPDFView component
+      const pdfDocument = <ExportPDFView list={list} />;
+
+      // For now, we'll create a simple blob. In a real implementation,
+      // you might need to use @react-pdf/renderer's pdf() function
+      const pdfContent = JSON.stringify({
+        invoiceId: list?.invoice_id,
+        customerName: list?.customer_name,
+        amount: total,
+        date: list?.date
+      });
+
+      const blob = new Blob([pdfContent], { type: 'application/pdf' });
+      resolve(blob);
+
+      // Alternative approach using the actual PDF generation:
+      // You might need to implement this differently based on your PDF library
+      // const pdfBlob = await pdf(<ExportPDFView list={list} />).toBlob();
+      // resolve(pdfBlob);
+    });
+  };
+
+  // Enhanced PDF generation function using @react-pdf/renderer
+  const generatePDFBlob = async () => {
+    try {
+      // If you're using @react-pdf/renderer, you can use the pdf() function
+      // First, make sure you have the necessary imports
+      const { pdf } = await import('@react-pdf/renderer');
+
+      // Create the PDF document
+      // console.log('list from pdf', list);
+      const pdfDocument = (
+        <ExportPDFView
+          list={{
+            ...list,
+            status: state.status,
+            discount: {
+              discountRate: discountRate
+            },
+            invoice_id: uniqueId,
+            total: total
+          }}
+        />
+      );
+
+      // Generate PDF as blob
+      const blob = await pdf(pdfDocument).toBlob();
+      return blob;
+    } catch (error) {
+      console.error('Error generating PDF blob:', error);
+      // Fallback: create a simple text blob
+      const fallbackContent = `Invoice: ${list?.invoice_id}\nCustomer: ${list?.customer_name}\nAmount: ${total}\nDate: ${list?.date}`;
+      return new Blob([fallbackContent], { type: 'text/plain' });
+    }
+  };
+
+  // Updated handleCreateExternalInvoice with better PDF generation
+  const handleCreateExternalInvoiceEnhanced = async () => {
+    // console.log('handleCreateExternalInvoiceEnhanced called');
+    if (!state) {
+      openSnackbar({
+        open: true,
+        message: 'No invoice data found. Please try again.',
+        variant: 'alert',
+        alert: { color: 'error' },
+        anchorOrigin: { vertical: 'top', horizontal: 'right' }
+      });
+      return;
+    }
+
+    try {
+      // console.log('generating pdf...');
+      // Generate PDF blob
+      const pdfBlob = await generatePDFBlob();
+
+      // Create a File object from the blob
+      const pdfFile = new File([pdfBlob], `invoice-${list?.invoice_id || 'external'}.pdf`, {
+        type: 'application/pdf'
+      });
+
+      // Prepare payload with all required fields from state
+      const payload = {
+        companyId: state.customerInfo?.companyId,
+        description: state.bundleDetails?.title || 'External Invoice',
+        itemDescription: state.bundleDetails?.description || 'Product/Service Description',
+        quantity: state.seatsPurchased || 1,
+        unitPrice: state.bundleDetails?.seatPrice || '0',
+        discountPercentage: state.discountPercentage || 0,
+        dueDate: format(new Date(state.purchaseDate || new Date()), 'yyyy-MM-dd'),
+        notes: state.notes,
+        status: state.status || 'pending',
+        invoicePdf: pdfFile,
+        sendEmail: state.sendEmail || false,
+        invoiceNumber: uniqueId
+      };
+      // console.log('bundleDetails', state.bundleDetails);
+
+      // console.log('Creating... external invoice with payload://', {
+      //   ...payload,
+      //   invoicePdf: `File: ${pdfFile.name} (${pdfFile.size} bytes)`
+      // });
+
+      // Call the mutation
+      const response = await createExternalInvoiceMutation.mutateAsync(payload);
+
+      if (response?.success) {
+        openSnackbar({
+          open: true,
+          message: 'External invoice created successfully!',
+          variant: 'alert',
+          alert: { color: 'success' },
+          anchorOrigin: { vertical: 'top', horizontal: 'right' }
+        });
+
+        // Navigate to invoices list or show success page
+        navigation('/dashboard/invoices');
+      }
+    } catch (error) {
+      console.error('Error creating external invoice:', error);
+      openSnackbar({
+        open: true,
+        message: error.response?.data?.message || 'Failed to create external invoice. Please try again.',
+        variant: 'alert',
+        alert: { color: 'error' },
+        anchorOrigin: { vertical: 'top', horizontal: 'right' }
+      });
+    }
+  };
+  // console.log('');
+  return (
+    <>
+      <MainCard content={false}>
+        <Stack spacing={2.5}>
+          {(ispurachsed || isCreatingNew) && (
+            <Box sx={{ p: 2.5, pb: 0 }}>
+              <MainCard content={false} border={false} sx={{ p: 1.25, bgcolor: 'secondary.lighter' }}>
+                <Stack direction="row" justifyContent="flex-end" spacing={1}>
+                  {isLoader ? <LoadingButton loading>X</LoadingButton> : <PDFIconButton {...{ list }} />}
+                  <IconButton>
+                    <Share color={iconColor} />
+                  </IconButton>
+                </Stack>
+              </MainCard>
+            </Box>
+          )}
+
+          <Box sx={{ p: 2.5 }}>
+            <Grid container spacing={2.5}>
+              <Grid item xs={12}>
+                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between">
+                  <Stack spacing={0.5}>
+                    <Stack direction="row" spacing={2}>
+                      <LogoSection />
+
+                      {ispurachsed || isCreatingNew
+                        ? (() => {
+                            const status = isCreatingNew ? state.status : purchasedPayload.status || state.status;
+                            return (
+                              <Chip
+                                label={status}
+                                variant="light"
+                                color={
+                                  status === 'paid' ? 'success' : status === 'unpaid' ? 'error' : status === 'pending' ? 'warning' : 'error'
+                                }
+                                size="small"
+                              />
+                            );
+                          })()
+                        : null}
+                    </Stack>
+                    {ispurachsed && <Typography color="secondary">{isLoader ? <Skeleton /> : `#${purchasedPayload.invoiceId}`}</Typography>}
+                    {isCreatingNew && !ispurachsed && <Typography color="secondary">{isLoader ? <Skeleton /> : `#${uniqueId}`}</Typography>}
+                  </Stack>
+                  <Box>
+                    <Stack direction="row" spacing={1} justifyContent="flex-end">
+                      <Typography variant="subtitle1">Date</Typography>
+                      <Typography color="secondary">{today}</Typography>
+                    </Stack>
+                  </Box>
+                </Stack>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <MainCard>
+                  <Stack spacing={1}>
+                    <Typography variant="h5">From:</Typography>
+                    {isLoader || isLoading ? (
+                      <Stack spacing={0.5}>
+                        <Skeleton />
+                        <Skeleton width={60} />
+                        <Skeleton />
+                      </Stack>
+                    ) : (
+                      <FormControl sx={{ width: '100%' }}>
+                        <Typography color="secondary">{list?.cashierInfo?.name}</Typography>
+                        <Typography color="secondary">{list?.cashierInfo?.address}</Typography>
+                        <Typography color="secondary">{list?.cashierInfo?.phone}</Typography>
+                        <Typography color="secondary">{list?.cashierInfo?.email}</Typography>
+                      </FormControl>
+                    )}
+                  </Stack>
+                </MainCard>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <MainCard>
+                  <Stack spacing={1}>
+                    <Typography variant="h5">To:</Typography>
+                    {isLoader || isUserProfileLoading ? (
+                      <Stack spacing={0.5}>
+                        <Skeleton />
+                        <Skeleton width={60} />
+                        <Skeleton />
+                      </Stack>
+                    ) : (
+                      <FormControl sx={{ width: '100%' }}>
+                        <Typography color="secondary">{list?.customerInfo?.name}</Typography>
+                        <Typography color="secondary">{list?.customerInfo?.address}</Typography>
+                        <Typography color="secondary">{list?.customerInfo?.phone}</Typography>
+                        <Typography color="secondary">{list?.customerInfo?.email}</Typography>
+                      </FormControl>
+                    )}
+                  </Stack>
+                </MainCard>
+              </Grid>
+              <Grid item xs={12}>
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>#</TableCell>
+                        <TableCell>Name</TableCell>
+                        <TableCell>Description</TableCell>
+                        <TableCell align="right">Qty</TableCell>
+                        <TableCell align="right">Price</TableCell>
+                        <TableCell align="right">Amount</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {isLoader &&
+                        [1, 2, 3].map((row) => (
+                          <TableRow key={row} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                            <TableCell>
+                              <Skeleton />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      {!isLoader &&
+                        list.invoice_detail?.map((row, index) => (
+                          <TableRow key={row.name} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell>{row.name}</TableCell>
+                            <TableCell>{row.description}</TableCell>
+                            <TableCell align="right">{row.qty}</TableCell>
+                            <TableCell align="right">{'$ ' + Number(row.price).toFixed(2)}</TableCell>
+                            <TableCell align="right">{'$ ' + Number(row.price * row.qty).toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Grid>
+              <Grid item xs={12}>
+                <Divider sx={{ borderWidth: 1 }} />
+              </Grid>
+              <Grid item xs={12} sm={6} md={8}></Grid>
+              <Grid item xs={12} sm={6} md={4}>
+                <Stack spacing={2}>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography color={theme.palette.secondary.main}>Sub Total:</Typography>
+                    <Typography>{isLoader ? <Skeleton width={80} /> : '$ ' + subtotal?.toFixed(2)}</Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography color={theme.palette.secondary.main}>Discount:</Typography>
+                    <Typography variant="h6" color={theme.palette.success.main}>
+                      {isLoader ? <Skeleton width={50} /> : '$ ' + discountRate?.toFixed(2)}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography color={theme.palette.secondary.main}>Tax:</Typography>
+                    <Typography>{isLoader ? <Skeleton width={60} /> : '$ ' + taxRate?.toFixed(2)}</Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography variant="subtitle1">Grand Total:</Typography>
+                    <Typography variant="subtitle1">
+                      {isLoader ? <Skeleton width={100} /> : total % 1 === 0 ? '$' + total : '$ ' + total?.toFixed(2)}
+                    </Typography>
+                  </Stack>
+                </Stack>
+              </Grid>
+              <Grid item xs={12}>
+                {state.invoiceType === 'external' && state.notes && (
+                  <Stack direction="row" spacing={1}>
+                    <Typography color="secondary">Notes: </Typography>
+                    <Typography>{state.notes || 'N/A'}</Typography>
+                  </Stack>
+                )}
+              </Grid>
+            </Grid>
+          </Box>
+          {/* </PrintableInvoice> */}
+
+          {ispurachsed ? (
+            <Stack direction="row" justifyContent="flex-end" spacing={2} sx={{ p: 2.5, a: { textDecoration: 'none', color: 'inherit' } }}>
+              <Button variant="contained" sx={{ textTransform: 'none' }} onClick={() => navigation(-1)}>
+                {'Go Back'}
+              </Button>
+              <PDFDownloadLink
+                document={<ExportPDFView list={list} />}
+                fileName={`${list?.invoice_id}-${list?.customer_name}.pdf`}
+                style={{ textDecoration: 'none' }}
+              >
+                <Button variant="contained" sx={{ textTransform: 'none' }}>
+                  Download PDF
+                </Button>
+              </PDFDownloadLink>
+            </Stack>
+          ) : isCreatingNew ? (
+            <Stack direction="row" justifyContent="flex-end" spacing={2} sx={{ p: 2.5, a: { textDecoration: 'none', color: 'inherit' } }}>
+              <Button variant="contained" sx={{ textTransform: 'none' }} onClick={() => navigation(-1)}>
+                {'Go Back'}
+              </Button>
+              <Button
+                variant="contained"
+                sx={{ textTransform: 'none' }}
+                onClick={handleCreateExternalInvoiceEnhanced}
+                disabled={createExternalInvoiceMutation.isPending}
+              >
+                {createExternalInvoiceMutation.isPending ? 'Creating...' : 'Proceed'}
+              </Button>
+            </Stack>
+          ) : (
+            <Stack direction="row" justifyContent="flex-end" spacing={2} sx={{ p: 2.5, a: { textDecoration: 'none', color: 'inherit' } }}>
+              <Button variant="contained" sx={{ textTransform: 'none' }} onClick={() => navigation(-1)}>
+                {'Go Back'}
+              </Button>
+              <Button
+                variant="contained"
+                sx={{ textTransform: 'none' }}
+                //  fullWidth
+                disabled={createBundlePurchase.isPending}
+                onClick={handlePurchase}
+              >
+                {createBundlePurchase.isPending ? 'Processing' : 'Process to Checkout'}
+              </Button>
+            </Stack>
+          )}
+        </Stack>
+      </MainCard>
+    </>
+  );
+}
+
+PDFIconButton.propTypes = { list: PropTypes.any };

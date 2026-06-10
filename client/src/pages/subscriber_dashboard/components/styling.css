@@ -1,0 +1,22 @@
+label {
+    margin-bottom: 0.3rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #383838;
+  }
+  
+  input,
+  textarea {
+    background-color: #fff;
+    padding: 0.5rem;
+    border-radius: 0.2rem;
+    margin-bottom: 2rem;
+    color: #616161;
+    border: 2px solid hsl(217, 91%, 60%, 30%);
+    outline: none;
+  }
+  
+  input:focus,
+  textarea:focus {
+    border: 2px solid hsl(217, 91%, 60%);
+  }

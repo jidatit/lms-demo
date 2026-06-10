@@ -1,0 +1,27 @@
+{
+  "admin-dashboard": "Admin Dashboard",
+  "dashboard": "Dashboard",
+  "reporting": "Reporting",
+  "groups": "Groups",
+  "users": "Users",
+  "learning-center": "Learning Center",
+  "campaign-hub": "Campaigns Hub",
+  "store": "Store",
+  "cart": "Cart",
+  "discount": "Discount",
+  "knowledgebase": "Knowledgebase",
+  "coming-soon": "Coming Soon",
+  "contact-us": "Contact Us",
+  "documentation": "Documentation",
+  "disabled-menu": "Disabled Menu",
+  "error-404": "Error 404",
+  "error-500": "Error 500",
+  "maintenance": "Maintenance",
+  "more-items": "More Items",
+  "pages": "Pages",
+  "sample-page": "Sample Page",
+  "under-construction": "Under Construction",
+
+  "active-campaigns": "Active Campaigns",
+  "training-modules": "Training Modules"
+}
