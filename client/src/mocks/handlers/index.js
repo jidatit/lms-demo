@@ -10,6 +10,8 @@ import {
   buildSeatDashboard,
   enrichBundle,
   enrichCourse,
+  enrichUserCourse,
+  enrichUserCourses,
   enrichInvoicesForList,
   enrichBundlePurchase,
   enrichGroup,
@@ -313,12 +315,13 @@ export async function routeRequest(config) {
     let items = [...store.userCourses];
     if (params.userId) items = items.filter((uc) => uc.userId === params.userId);
     if (params.courseId) items = items.filter((uc) => uc.courseId === params.courseId);
-    return success(items);
+    return success(enrichUserCourses(items, store));
   }
 
   const userCourseMatch = path.match(/^\/userCourses\/([^/]+)$/);
   if (method === 'GET' && userCourseMatch && !path.includes('toggle')) {
-    return success(store.userCourses.find((uc) => uc.id === userCourseMatch[1]));
+    const uc = store.userCourses.find((item) => item.id === userCourseMatch[1]);
+    return success(enrichUserCourse(uc, store));
   }
 
   const toggleTriggerMatch = path.match(/^\/userCourses\/([^/]+)\/toggle-trigger$/);
@@ -330,7 +333,7 @@ export async function routeRequest(config) {
         uc.id === id ? { ...uc, triggerCourse: body.triggerCourse } : uc
       )
     }));
-    return { success: true, data: getSeedStore().userCourses.find((uc) => uc.id === id), updatedBy: requestedBy() };
+    return { success: true, data: enrichUserCourse(getSeedStore().userCourses.find((uc) => uc.id === id), getSeedStore()), updatedBy: requestedBy() };
   }
 
   // ─── Groups (modern) ─────────────────────────────────────

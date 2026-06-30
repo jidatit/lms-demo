@@ -319,6 +319,24 @@ export function enrichCourse(course) {
   };
 }
 
+export function enrichUserCourse(uc, store) {
+  if (!uc) return null;
+  const course = store.courses.find((c) => c.id === uc.courseId);
+  return {
+    ...uc,
+    launchDate: uc.launchDate || uc.enrolledAt || '2025-01-01T00:00:00Z',
+    course: enrichCourse(course) || {
+      id: uc.courseId,
+      title: 'Untitled Course',
+      description: ''
+    }
+  };
+}
+
+export function enrichUserCourses(items, store) {
+  return items.map((uc) => enrichUserCourse(uc, store));
+}
+
 export function buildInvoiceWidgetData(store) {
   const paid = store.invoices.filter((i) => i.status === 'paid');
   const pending = store.invoices.filter((i) => i.status === 'pending' || i.status === 'unpaid');

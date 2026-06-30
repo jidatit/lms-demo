@@ -270,7 +270,7 @@ export function buildSeedStore() {
   const userCourses = [
     { id: 'uc-001', userId: 'user-sub-001', courseId: 'course-001', progress: 72, status: 'active', triggerCourse: false, enrolledAt: '2025-04-01T08:00:00Z' },
     { id: 'uc-002', userId: 'user-sub-001', courseId: 'course-002', progress: 100, status: 'completed', triggerCourse: false, enrolledAt: '2025-03-15T08:00:00Z' },
-    { id: 'uc-003', userId: 'user-sub-001', courseId: 'course-003', progress: 45, status: 'active', triggerCourse: true, enrolledAt: '2025-04-10T08:00:00Z' },
+    { id: 'uc-003', userId: 'user-sub-001', courseId: 'course-003', progress: 45, status: 'active', triggerCourse: true, enrolledAt: '2025-04-10T08:00:00Z', launchDate: '2026-12-01T00:00:00Z' },
     { id: 'uc-004', userId: 'user-sub-002', courseId: 'course-001', progress: 30, status: 'active', triggerCourse: false, enrolledAt: '2025-04-05T08:00:00Z' }
   ];
 

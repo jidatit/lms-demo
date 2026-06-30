@@ -1,7 +1,7 @@
 import { buildSeedStore } from './data/seedData';
 import { getStore, setStore, isStoreEmpty } from './storage';
 
-const SEED_VERSION = 4;
+const SEED_VERSION = 5;
 
 export function seedIfEmpty() {
   const storedVersion = localStorage.getItem('lms_demo_seed_version');
